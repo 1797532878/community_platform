@@ -1,0 +1,46 @@
+#ServerProperties
+server:
+  port: 8081
+  #  servlet:
+  #    context-path: /community
+
+  #ThymeleafProperties
+spring:
+  #mail
+  mail:
+    username: 1797532878@qq.com
+    password: ojaftpbpacvpccde
+    host: smtp.qq.com
+    port: 465
+    properties:
+      mail:
+        transport:
+          protocol: smtp
+        smtp:
+          socketFactory:
+            class: javax.net.ssl.SSLSocketFactory
+          port: ${spring.mail.port}
+          auth: true
+          starttls:
+            enable: true
+            required: true
+  # DataSourceProperties
+  #mysql 驱动   useSSL 不启用安全连接
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/community_platform?characterEncoding=utf-8&useSSL=false&serverTimezone=Hongkong&allowPublicKeyRetrieval=true
+    username: root
+    password: 123456
+    hikari.maximum-pool-size: 15
+    hikari.minimum-idle: 5
+    hikari.idle-timeout: 30000
+# MybatisProperties
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  #mapper文件映射的实体类地址
+  type-aliases-package: com.community.platform.entity
+  #自动生成主键id
+  configuration:
+    useGeneratedKeys: true
+    #驼峰命名法
+    mapUnderscoreToCamelCase: true

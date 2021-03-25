@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <link rel="icon" href="https://static.nowcoder.com/images/logo_87_87.png"/>
+    <title>牛客网-激活账号</title>
+</head>
+<body>
+	<div>
+		<p>
+			<b th:text="${username}">xxx@xxx.com</b>, 您好!
+		</p>
+		<p>
+			您正在注册本地化社区服务公益平台, 这是一封激活邮件, 请点击
+			<a th:href="${url}">此链接</a>,或者复制
+			<span th:text="${url}"></span>到浏览器激活您的账号!
+		</p>
+	</div>
+</body>
+</html>
