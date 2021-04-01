@@ -6,16 +6,14 @@ import com.community.platform.entity.User;
 import com.community.platform.service.MessageService;
 import com.community.platform.service.UserService;
 import com.community.platform.util.CommunityUtil;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Controller
 public class MessageController {
@@ -29,7 +27,6 @@ public class MessageController {
     @RequestMapping(path = "/letter/list",method = RequestMethod.POST)
     @ResponseBody
     public String getLetterList(@RequestBody Page page, HttpServletRequest request) {
-
         HttpSession session = request.getSession();
         User user = (User) session.getAttribute("user");
 
@@ -65,6 +62,7 @@ public class MessageController {
         return CommunityUtil.getJSONString(400,"未登录");
     }
 
+    // 私信详情
     @RequestMapping(path = "/letter/detail/{conversationId}",method = RequestMethod.POST)
     @ResponseBody
     public String getLetterDetail (@PathVariable String conversationId,@RequestBody Page page,HttpServletRequest request) {
@@ -95,6 +93,7 @@ public class MessageController {
 
         HttpSession session = request.getSession();
         User user = (User) session.getAttribute("user");
+        // 私信目标
         if ( user != null ) {
             User targetUser;
             if (user.getId() == id0) {
@@ -105,7 +104,64 @@ public class MessageController {
             map1.put("targetUser",targetUser);
         }
 
+        // 设置消息为已读
+        List<Integer> letterIds = getLetterIds(letterList, user);
+        if (!letterIds.isEmpty()){
+            messageService.readMessage(letterIds);
+        }
+
         return CommunityUtil.getJSONString(200,"ok",map1);
     }
 
+    // 遍历出未读消息
+    private List<Integer> getLetterIds(List<Message> letterList,User user) {
+        List<Integer> ids = new ArrayList<>();
+
+        if (letterList != null) {
+            for (Message message : letterList) {
+                if (user.getId() == message.getToId() && message.getStatus() == 0) {
+                    ids.add(message.getId());
+                }
+            }
+        }
+        return ids;
+    }
+
+
+    //发送私信
+    @RequestMapping(path = "/letter/send",method = RequestMethod.POST)
+    @ResponseBody
+    public String sendLetter (String toName,String content,HttpServletRequest request) {
+        User targetUser = userService.findUserByName(toName);
+        if (targetUser == null) {
+            return CommunityUtil.getJSONString(1,"目标用户不存在！");
+        }
+        if (StringUtils.isBlank(content)) {
+            return CommunityUtil.getJSONString(2,"内容不能为空！");
+        }
+        HttpSession session = request.getSession();
+        User user = (User) session.getAttribute("user");
+        Message message = new Message();
+        message.setFromId(user.getId());
+        message.setToId(targetUser.getId());
+        if (message.getFromId() < message.getToId()) {
+            message.setConversationId(message.getFromId() + "_" + message.getToId());
+        }else {
+            message.setConversationId(message.getToId() + "_" + message.getFromId());
+        }
+        message.setContent(content);
+        message.setCreateTime(new Date());
+        messageService.addMessage(message);
+
+        return CommunityUtil.getJSONString(0);
+
+    }
+    //删除私信
+    @RequestMapping(path = "/letter/delete",method = RequestMethod.POST)
+    @ResponseBody
+    public String deleteLetter(String conversationId,String content){
+        messageService.dleMessage(conversationId,content);
+        return CommunityUtil.getJSONString(0);
+
+    }
 }
