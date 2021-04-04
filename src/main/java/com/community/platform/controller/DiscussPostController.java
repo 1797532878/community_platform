@@ -3,6 +3,7 @@ package com.community.platform.controller;
 import com.community.platform.entity.*;
 import com.community.platform.service.CommentService;
 import com.community.platform.service.DiscussPostService;
+import com.community.platform.service.LikeService;
 import com.community.platform.service.UserService;
 import com.community.platform.util.CommunityConstant;
 import com.community.platform.util.CommunityUtil;
@@ -27,6 +28,9 @@ public class DiscussPostController implements CommunityConstant {
     @Autowired
     private CommentService commentService;
 
+    @Autowired
+    private LikeService likeService;
+
     @RequestMapping(path = "/add",method = RequestMethod.POST)
     @ResponseBody
     public String addDiscussPost(HttpServletRequest request, String title, String content) {
@@ -49,11 +53,34 @@ public class DiscussPostController implements CommunityConstant {
 
     @RequestMapping(path = "/detail/{discussPostId}",method = RequestMethod.POST)
     @ResponseBody
-    public String getDiscussPost(@PathVariable("discussPostId") int discussPostId,@RequestBody Page page) {
+    public String getDiscussPost(@PathVariable("discussPostId") int discussPostId,@RequestBody Page page,
+                                 HttpServletRequest request,@CookieValue("ticket") String ticket) {
         // 帖子
         DiscussPost post = discussPostService.findDiscussPostById(discussPostId);
         // 作者
         User user = userService.findUserById(post.getUserId());
+
+        // 赞数量
+        long likeCount = likeService.findEntityLikeCount(ENTITY_TYPE_POST,discussPostId);
+        // 赞状态
+        HttpSession session = request.getSession();
+        // 用户
+        User user1 = (User) session.getAttribute("user");
+        LoginTicket loginTicket = userService.findLoginTicket(ticket);
+
+
+
+        int likeStatus;
+        // 已退出 或者 没有登录
+        if (loginTicket.getStatus() == 1 || user1 == null) {
+            likeStatus = 0;
+        } else {
+            likeStatus = likeService.findEntityLikeStatus(user1.getId(),ENTITY_TYPE_POST,discussPostId);
+        }
+        Map<String,Object> map = new HashMap<>();
+        map.put("likeCount",likeCount);
+        map.put("likeStatus",likeStatus);
+
 
         //评论的分页信息
         page.setPath("http://localhost:8081/communityPlatform/discuss/detail/" + discussPostId);
@@ -71,6 +98,17 @@ public class DiscussPostController implements CommunityConstant {
                 //评论者的信息
                 commentVo.put("user",userService.findUserById(comment.getUserId()));
 
+                // 赞数量
+                likeCount = likeService.findEntityLikeCount(ENTITY_TYPE_COMMENT,comment.getId());
+                commentVo.put("likeCount",likeCount);
+                // 赞状态
+                if (loginTicket.getStatus() == 1 || user1 == null) {
+                    likeStatus = 0;
+                } else {
+                    likeStatus = likeService.findEntityLikeStatus(user1.getId(),ENTITY_TYPE_COMMENT,comment.getId());
+                }
+                commentVo.put("likeStatus",likeStatus);
+
                 //评论的回复
                 List<Comment> replyList = commentService.findCommentsByEntity(
                         ENTITY_TYPE_COMMENT, comment.getId(), 0, Integer.MAX_VALUE);
@@ -86,6 +124,18 @@ public class DiscussPostController implements CommunityConstant {
                         // 回复目标
                         User targetUser = reply.getTargetId() == 0 ? null : userService.findUserById(reply.getTargetId());
                         replyVo.put("targetUser",targetUser);
+
+                        // 赞数量
+                        likeCount = likeService.findEntityLikeCount(ENTITY_TYPE_COMMENT, reply.getId());
+                        replyVo.put("likeCount",likeCount);
+                        // 赞状态
+                        if (loginTicket.getStatus() == 1 || user1 == null) {
+                            likeStatus = 0;
+                        } else {
+                            likeStatus = likeService.findEntityLikeStatus(user1.getId(),ENTITY_TYPE_COMMENT,reply.getId());
+                        }
+                        replyVo.put("likeStatus",likeStatus);
+
                         //给List装入map
                         replyVoList.add(replyVo);
                     }
@@ -100,8 +150,6 @@ public class DiscussPostController implements CommunityConstant {
             }
         }
 
-
-        Map<String,Object> map = new HashMap<>();
         map.put("user",user);
         map.put("post",post);
         map.put("comment",commentVOList);
