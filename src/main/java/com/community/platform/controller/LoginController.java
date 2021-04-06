@@ -5,13 +5,16 @@ import com.community.platform.entity.User;
 import com.community.platform.service.UserService;
 import com.community.platform.util.CommunityConstant;
 import com.community.platform.util.CommunityUtil;
+import com.community.platform.util.RedisKeyUtil;
 import com.google.code.kaptcha.Producer;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.support.SessionStatus;
 
 import javax.imageio.ImageIO;
 import javax.servlet.http.Cookie;
@@ -24,6 +27,7 @@ import java.io.OutputStream;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @Controller
 public class LoginController implements CommunityConstant {
@@ -36,6 +40,9 @@ public class LoginController implements CommunityConstant {
 
     @Value("${server.servlet.context-path}")
     private String contextPath;
+
+    @Autowired
+    private RedisTemplate redisTemplate;
 
 
     @PostMapping("/register")
@@ -68,14 +75,26 @@ public class LoginController implements CommunityConstant {
         return "/site/operate-result";
     }
 
+    // 优化： 使用redis 存储验证码
     @RequestMapping(path = "/kaptcha",method = RequestMethod.GET)
-    public void getKaptcha(HttpServletResponse response, HttpSession session){
+    public void getKaptcha(HttpServletResponse response/*, HttpSession session*/){
         //生成验证码
         String text = kaptchaProducer.createText();
         BufferedImage image = kaptchaProducer.createImage(text);
 
-        //将验证码存入session  存在跨域问题需要设置axios
-        session.setAttribute("kaptcha",text);
+//        //将验证码存入session  存在跨域问题需要设置axios
+//        session.setAttribute("kaptcha",text);
+
+        // 使用redis
+        String kaptchaOwner = CommunityUtil.generateUUID();
+         Cookie cookie = new Cookie("kaptchaOwner",kaptchaOwner);
+         cookie.setMaxAge(60);
+         cookie.setPath(contextPath);
+         response.addCookie(cookie);
+
+         // redis
+        String redisKey = RedisKeyUtil.getKaptchaKey(kaptchaOwner);
+        redisTemplate.opsForValue().set(redisKey,text,60, TimeUnit.SECONDS);
 
         //将图片输出给浏览器
         response.setContentType("image/png");
@@ -87,15 +106,25 @@ public class LoginController implements CommunityConstant {
         }
     }
 
+    // 优化:使用redis存储验证码 不使用session
     //登录
     @RequestMapping(path = "/login",method = RequestMethod.POST)
     @ResponseBody
     public String login(@RequestParam(value = "username") String username,@RequestParam(value = "password") String password,
                         @RequestParam(value = "code") String code,@RequestParam(value = "rememberme",required = false) String rememberme,
-                        HttpSession session,HttpServletResponse response) {
+                        /*HttpSession session,*/HttpServletResponse response,@CookieValue("kaptchaOwner") String kaptchaOwner) {
         Map<String,Object> map = new HashMap<>();
         //检查验证码
-        String kaptcha = (String) session.getAttribute("kaptcha");
+//        String kaptcha = (String) session.getAttribute("kaptcha");
+
+        // 使用redis
+        String kaptcha = null;
+        if (StringUtils.isNotBlank(kaptchaOwner)) {
+            String redisKey = RedisKeyUtil.getKaptchaKey(kaptchaOwner);
+            kaptcha = (String) redisTemplate.opsForValue().get(redisKey);
+        }
+
+
         if (StringUtils.isBlank(kaptcha) || StringUtils.isBlank(code) || !kaptcha.equalsIgnoreCase(code)) {
             map.put("errorMsg","验证码不正确!");
             return CommunityUtil.getJSONString(400,"验证码错误",map);
@@ -117,8 +146,10 @@ public class LoginController implements CommunityConstant {
     //退出
     @RequestMapping(path = "/logout",method = RequestMethod.GET)
     @ResponseBody
-    public String logout(@CookieValue("ticket") String ticket){
+    public String logout(@CookieValue("ticket") String ticket, HttpSession session, SessionStatus sessionStatus){
         userService.logout(ticket);
+        session.invalidate();
+        sessionStatus.setComplete();
         return CommunityUtil.getJSONString(200);
     }
 

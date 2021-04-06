@@ -2,7 +2,10 @@ package com.community.platform.controller;
 
 import com.community.platform.entity.LoginTicket;
 import com.community.platform.entity.User;
+import com.community.platform.service.FollowService;
+import com.community.platform.service.LikeService;
 import com.community.platform.service.UserService;
+import com.community.platform.util.CommunityConstant;
 import com.community.platform.util.CommunityUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +26,7 @@ import java.util.Objects;
 
 @Controller
 @RequestMapping("/user")
-public class UserController {
+public class UserController implements CommunityConstant {
 
     @Value("${community.path.upload}")
     private String uploadPath;
@@ -36,6 +39,12 @@ public class UserController {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private LikeService likeService;
+
+    @Autowired
+    private FollowService followService;
 
     //上传头像   必须要登录
     @RequestMapping(path = "/upload",method = RequestMethod.POST)
@@ -134,4 +143,37 @@ public class UserController {
         }
     }
 
+    // 个人主页
+    @RequestMapping(path = "/profile/{userId}",method = RequestMethod.POST)
+    @ResponseBody
+    public String getProfilePage (@PathVariable("userId") int userId,HttpServletRequest request) {
+        User user = userService.findUserById(userId);
+        if (user == null) {
+            throw new RuntimeException("该用户不存在!");
+        }
+
+        // 用户
+        Map<String,Object> map = new HashMap<>();
+        map.put("user",user);
+        // 点赞数量
+        int likeCount = likeService.findUserLikeCount(userId);
+        map.put("likeCount",likeCount);
+
+        // 关注数量
+        // 他 关注的 数量
+        long followeeCount = followService.findFolloweeCount(userId,ENTITY_TYPE_USER);
+        // 粉丝数量
+        long followerCount = followService.findFollowerCount(ENTITY_TYPE_USER,userId);
+        map.put("followeeCount",followeeCount);
+        map.put("followerCount",followerCount);
+        // 是否已关注
+        boolean hasFolllowed = false;
+        User hoder = (User) request.getSession().getAttribute("user");
+        if (hoder != null) {
+            // 我 关注 他
+            hasFolllowed = followService.hasFollowed(hoder.getId(),ENTITY_TYPE_USER,userId);
+        }
+        map.put("hasFollowed",hasFolllowed);
+        return CommunityUtil.getJSONString(0,"ok",map);
+    }
 }

@@ -5,6 +5,8 @@ import com.community.platform.entity.LoginTicket;
 import org.apache.ibatis.annotations.*;
 
 @Mapper
+@Deprecated
+//  已经使用redis存储进行优化
 public interface LoginTicketMapper {
 
     //自动生成主键要注明
