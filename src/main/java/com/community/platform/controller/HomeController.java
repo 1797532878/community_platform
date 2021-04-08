@@ -6,6 +6,7 @@ import com.community.platform.entity.Page;
 import com.community.platform.entity.User;
 import com.community.platform.service.DiscussPostService;
 import com.community.platform.service.LikeService;
+import com.community.platform.service.MessageService;
 import com.community.platform.service.UserService;
 import com.community.platform.util.CommunityConstant;
 import com.community.platform.util.CommunityUtil;
@@ -56,6 +57,7 @@ public class HomeController implements CommunityConstant {
                 discussPosts.add(map);
             }
         }
+
         JSONObject jsonObject = new JSONObject();
         return jsonObject.toJSONString(discussPosts);
     }

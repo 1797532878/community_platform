@@ -2,6 +2,7 @@ package com.community.platform.controller;
 
 import com.community.platform.entity.LoginTicket;
 import com.community.platform.entity.User;
+import com.community.platform.service.MessageService;
 import com.community.platform.service.UserService;
 import com.community.platform.util.CommunityConstant;
 import com.community.platform.util.CommunityUtil;
@@ -43,6 +44,9 @@ public class LoginController implements CommunityConstant {
 
     @Autowired
     private RedisTemplate redisTemplate;
+
+    @Autowired
+    private MessageService messageService;
 
 
     @PostMapping("/register")
@@ -164,6 +168,13 @@ public class LoginController implements CommunityConstant {
             //设置已登录
             HttpSession session = request.getSession();
             session.setAttribute("user",user);
+
+            // 请求时查询未读消息数量
+            int letterUnreadTotalCount = messageService.findLetterUnreadCount(user.getId(),null);
+            int noticeUnreadCount = messageService.findNoticeUnreadCount(user.getId(),null);
+
+            map.put("unreadCount",letterUnreadTotalCount + noticeUnreadCount);
+
             return CommunityUtil.getJSONString(200,"已登录",map);
         }else {
             return CommunityUtil.getJSONString(400,"没有登录");

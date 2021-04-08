@@ -1,7 +1,9 @@
 package com.community.platform.controller;
 
+import com.community.platform.entity.Event;
 import com.community.platform.entity.Page;
 import com.community.platform.entity.User;
+import com.community.platform.event.EventProducer;
 import com.community.platform.service.FollowService;
 import com.community.platform.service.UserService;
 import com.community.platform.util.CommunityConstant;
@@ -25,11 +27,24 @@ public class FollowController implements CommunityConstant {
     @Autowired
     private UserService userService;
 
+    @Autowired
+    private EventProducer eventProducer;
+
     @RequestMapping(path = "/follow",method = RequestMethod.POST)
     @ResponseBody
     public String Follow(int entityType, int entityId, int loginUserId) {
 
         followService.follow(loginUserId,entityType,entityId);
+
+        // 触发关注事件
+        Event event = new Event()
+                .setTopic(TOPIC_FOLLOW)
+                .setUserId(loginUserId)
+                .setEntityType(entityType)
+                .setEntityId(entityId)
+                .setEntityUserId(entityId);
+        // 当前只能关注人 所以entityId就是entityUserId
+        eventProducer.fireEvent(event);
 
         return CommunityUtil.getJSONString(0,"已关注");
     }
